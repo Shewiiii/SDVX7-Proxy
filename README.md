@@ -18,6 +18,8 @@ This repository is a cleaned-up version of [SDVX ∇ VolForce Tracker](https://g
 
 Follow these steps only if you want to install the proxy alone.
 
+
+- Download the ZIP of this repository under Code, unzip it, and move `SDVX7-Tracker-Proxy-main/` folder into your game folder.
 - Run `setup.bat` and follow the instructions.
 - From now on, `run-proxy.bat` before starting the game. Otherwise, it will not connect to the network, but you can change back `EA Service URL` to your server URL at any point .
 

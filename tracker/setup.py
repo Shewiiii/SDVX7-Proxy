@@ -173,7 +173,10 @@ def configure() -> None:
         upstream = "http://ea.ryu7w7.xyz/service"
     else:
         if server == "custom":
-            print("WARNING: Some data, such as total VolForce or the top 50, may not be correctly parsed by the proxy.")
+            print(
+                "WARNING: Some data returned by the server on card login, such as the saved chart data"
+                " used to calculate VolForce, may not be correctly parsed by the proxy."
+            )
         upstream = "http://127.0.0.1:8083" if server == "asphyxia" else ""
         if server == default_server and existing.get("TRACKER_SERVER") == server:
             upstream = saved_upstream or upstream

@@ -4,22 +4,19 @@ import os
 import shutil
 import subprocess
 import sys
-import urllib.request
 import venv
-from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 RUNTIME_ROOT = REPO_ROOT / "runtime"
 VENV_ROOT = REPO_ROOT / ".venv"
-DECODER_COMMIT_SHA = "c1a01de4b9412d9bb3f9a5eed452f2c221739aff"  # Oct 2, 2026
-DECODER_FILES = (
-    "src/utils/AutoBuffer.ts",
-    "src/utils/KBinJSON.ts",
-    "src/utils/KonmaiEncrypt.ts",
-    "src/utils/Logger.ts",
-    "src/utils/LzKN.ts",
-    "LICENSE",
+UTILS_ROOT = REPO_ROOT / "utils"
+UTILITY_FILES = (
+    "AutoBuffer.ts",
+    "KBinJSON.ts",
+    "KonmaiEncrypt.ts",
+    "Logger.ts",
+    "LzKN.ts",
 )
 PYTHON_IMPORTS = "import dotenv"
 
@@ -46,83 +43,49 @@ def node_tools() -> tuple[str, str]:
     return node, npm
 
 
-def decoder_environment(root: Path) -> dict[str, str]:
+def runtime_environment() -> dict[str, str]:
     env = os.environ.copy()
+    # The bundled utilities sit beside runtime, where npm installs dependencies.
+    node_paths = [str(RUNTIME_ROOT / "node_modules")]
+    if env.get("NODE_PATH"):
+        node_paths.append(env["NODE_PATH"])
     env.update(
-        RYUNET_ROOT=str(root),
+        NODE_PATH=os.pathsep.join(node_paths),
         TS_NODE_PROJECT=str(RUNTIME_ROOT / "tsconfig.json"),
         TS_NODE_TRANSPILE_ONLY="true",
     )
     return env
 
 
-def probe_decoders(node: str, root: Path) -> bool:
-    if not root.is_dir():
+def probe_runtime(node: str) -> bool:
+    if not all((UTILS_ROOT / name).is_file() for name in UTILITY_FILES):
         return False
     script = (
-        "const p = require('path'); const r = process.env.RYUNET_ROOT; "
+        "const p = require('path'); "
         "for (const f of ['KonmaiEncrypt', 'LzKN', 'KBinJSON']) "
-        "require(p.join(r, 'src/utils', f)); "
-        "require(p.join(r, 'node_modules/fast-xml-parser'));"
+        "require(p.resolve('../utils', f)); "
+        "require('fast-xml-parser');"
     )
     result = subprocess.run(
-        [node, "-r", str(root / "node_modules/ts-node/register"), "-e", script],
+        [node, "-r", str(RUNTIME_ROOT / "node_modules/ts-node/register"), "-e", script],
         check=False,
-        cwd=root,
-        env=decoder_environment(root),
+        cwd=RUNTIME_ROOT,
+        env=runtime_environment(),
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
     return result.returncode == 0
 
 
-def find_decoder_root(node: str) -> Path | None:
-    override = os.getenv("RYUNET_ROOT")
-    if override:
-        root = Path(override).expanduser().resolve()
-        if probe_decoders(node, root):
-            return root
-    for root in (RUNTIME_ROOT, REPO_ROOT / "RyuNET-core-master"):
-        if probe_decoders(node, root):
-            return root
-    return None
-
-
-def download_decoders() -> None:
-    marker = RUNTIME_ROOT / ".decoder-revision"
-    if (
-        marker.is_file()
-        and marker.read_text(encoding="utf-8").strip() == DECODER_COMMIT_SHA
-        and all((RUNTIME_ROOT / name).is_file() for name in DECODER_FILES)
-    ):
-        return
-
-    def fetch(name: str) -> tuple[str, bytes]:
-        url = f"https://raw.githubusercontent.com/Ryu7w7/RyuNET-core/{DECODER_COMMIT_SHA}/{name}"
-        request = urllib.request.Request(
-            url, headers={"User-Agent": "SDVX-VolForce-Tracker"}
-        )
-        with urllib.request.urlopen(request, timeout=30) as response:
-            return name, response.read()
-
-    print(
-        "Downloading the RyuNET protocol decoders...",
-        flush=True,
-    )
-    with ThreadPoolExecutor(max_workers=6) as pool:
-        downloads = list(pool.map(fetch, DECODER_FILES))
-    for name, content in downloads:
-        target = RUNTIME_ROOT / name
-        target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_bytes(content)
-    marker.write_text(DECODER_COMMIT_SHA + "\n", encoding="utf-8")
-
-
 def install() -> Path:
     node, npm = node_tools()
+    if not all((UTILS_ROOT / name).is_file() for name in UTILITY_FILES):
+        raise RuntimeError(
+            "Bundled protocol utilities are missing. Restore the utils folder."
+        )
     python = venv_python()
     if not python.is_file():
-        print("Creating the proxy's Python environment...", flush=True)
+        print("Creating the proxy's Python venv...", flush=True)
         venv.EnvBuilder(with_pip=True).create(VENV_ROOT)
     print("Installing Python requirements...", flush=True)
     run(
@@ -137,15 +100,15 @@ def install() -> Path:
         ]
     )
     run([str(python), "-c", PYTHON_IMPORTS])
-    root = find_decoder_root(node)
-    if root is None:
-        download_decoders()
-        print("Installing the decoder dependencies...", flush=True)
+    if not probe_runtime(node):
+        print("Installing the proxy's Node.js dependencies...", flush=True)
         run([npm, "ci", "--no-audit", "--no-fund"], cwd=RUNTIME_ROOT)
-        if not probe_decoders(node, RUNTIME_ROOT):
-            raise RuntimeError("Decoder check failed. Run setup.bat again to retry.")
+        if not probe_runtime(node):
+            raise RuntimeError(
+                "Protocol utility check failed. Run setup.bat again to retry."
+            )
     else:
-        print(f"Reusing working decoders in {root}", flush=True)
+        print("Proxy's Node.js dependencies are already installed.", flush=True)
     return python
 
 
@@ -159,12 +122,68 @@ def configure() -> None:
 
     from config import (
         GAME_LOG_PATH,
+        GAME_ROOT,
         PLAYTIME_STATE_PATH,
     )
     from tracker.playtime import PlaytimeTracker, parse_playtime
+    from tracker.spice import (
+        SpiceConfig,
+        config_path,
+        ensure_spicecfg_closed,
+        is_proxy_url,
+        proxy_port,
+        service_url,
+    )
 
+    ensure_spicecfg_closed()
     env_path = REPO_ROOT / ".env"
     existing = dotenv_values(env_path)
+    port = proxy_port(
+        os.getenv("TRACKER_PROXY_PORT") or existing.get("TRACKER_PROXY_PORT") or "8080"
+    )
+    local_url = f"http://127.0.0.1:{port}/service"
+    spice_path = config_path(
+        GAME_ROOT,
+        os.getenv("TRACKER_SPICE_CONFIG") or existing.get("TRACKER_SPICE_CONFIG") or "",
+    )
+    spice = SpiceConfig(spice_path)
+    saved_upstream = (
+        os.getenv("TRACKER_UPSTREAM") or existing.get("TRACKER_UPSTREAM") or ""
+    )
+    default_server = (
+        (os.getenv("TRACKER_SERVER") or existing.get("TRACKER_SERVER") or "ryunet")
+        .strip()
+        .lower()
+    )
+    if default_server not in {"ryunet", "asphyxia", "custom"}:
+        default_server = "ryunet"
+    if saved_upstream:
+        print(f"Previously saved upstream: {saved_upstream}")
+    # The game's EA3 URL can be a bundled placeholder. Always ask which server
+    # to use, including on reruns, before changing either saved configuration.
+    server = ""
+    while server not in {"ryunet", "asphyxia", "custom"}:
+        server = prompt("EA server (ryunet/asphyxia/custom)", default_server).lower()
+        if server not in {"ryunet", "asphyxia", "custom"}:
+            print("Enter ryunet, asphyxia, or custom.")
+    if server == "ryunet":
+        upstream = "http://ea.ryu7w7.xyz/service"
+    else:
+        upstream = "http://127.0.0.1:8083" if server == "asphyxia" else ""
+        if server == default_server and existing.get("TRACKER_SERVER") == server:
+            upstream = saved_upstream or upstream
+        upstream = prompt("EA server URL", upstream)
+    while True:
+        try:
+            upstream = service_url(upstream)
+            if is_proxy_url(upstream, port):
+                raise ValueError("The upstream server cannot be the proxy itself.")
+            break
+        except ValueError as error:
+            print(error)
+            upstream = prompt("EA server URL")
+    print(f"Upstream EA server: {upstream}")
+    print(f"Spice2x config: {spice_path}")
     previous = existing.get("TRACKER_INITIAL_PLAYTIME") or "0"
     try:
         previous_seconds = parse_playtime(previous)
@@ -173,7 +192,7 @@ def configure() -> None:
     initial_playtime = previous if previous_seconds is not None else "0"
     while True:
         initial_playtime = prompt(
-            "RyuNET starting playtime (2d 7h, 13h or 12h 30m)",
+            "Starting playtime (2d 7h, 13h or 12h 30m)",
             initial_playtime,
         )
         try:
@@ -200,8 +219,21 @@ def configure() -> None:
             TRACKER_PLAYTIME_BASELINE_PLAYS=str(checkpoint["plays"]),
         )
 
-    for key, value in playtime_settings.items():
+    ensure_spicecfg_closed()
+    # Save the upstream before redirecting the game, so reruns cannot lose it.
+    settings = {
+        "TRACKER_SERVER": server,
+        "TRACKER_UPSTREAM": upstream,
+        "TRACKER_PROXY_PORT": str(port),
+        "TRACKER_SPICE_CONFIG": str(spice_path),
+        **playtime_settings,
+    }
+    for key, value in settings.items():
         set_key(env_path, key, value, quote_mode="always")
+    backup = spice.set_url(local_url)
+    print(f"EA Service URL set to {local_url}")
+    if backup is not None:
+        print(f"Original Spice2x config backed up to {backup}")
     print("Configuration saved.")
 
 

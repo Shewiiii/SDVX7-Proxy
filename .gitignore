@@ -1,5 +1,4 @@
 .env
-sdvx_rpc.py
 cache/
 __pycache__/
 .venv/

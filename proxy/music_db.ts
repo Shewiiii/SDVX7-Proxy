@@ -74,7 +74,7 @@ export class ChartLevelStore {
                 this.signatures.set(filename, signature);
                 changed = true;
             } catch (caught) {
-                // A sync may briefly leave a file incomplete; retry next result.
+                // A sync may briefly leave a file incomplete, retry next result.
                 console.warn(
                     "Cannot load music database:",
                     filename,

@@ -31,7 +31,7 @@ type ProtocolNode = Record<string, unknown>;
 type FieldReader = (node: ProtocolNode, name: string) => unknown;
 
 // Ryu7w7/asphyxia_plugins, handlers/profiles.ts: sv7_load_m uses 26 u32s
-// per chart. Slots 0/1 identify the chart; slot 11 is its saved best VF,
+// per chart. Slots 0/1 identify the chart, slot 11 is its saved best VF,
 // including the previous-version fallback supplied by the server.
 export class TotalVolforceStore {
     private readonly filename: string;

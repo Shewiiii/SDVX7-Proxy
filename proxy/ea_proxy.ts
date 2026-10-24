@@ -10,32 +10,33 @@ const { ChartLevelStore } = require("./music_db");
 const repoRoot = path.resolve(__dirname, "..");
 const totalVolforce = new TotalVolforceStore(
     path.join(repoRoot, "cache", "total_volforce.json"),
-    process.env.TRACKER_VOLFORCE_HISTORY || path.join(repoRoot, "volforce_history.jsonl"),
+    process.env.TRACKER_VOLFORCE_HISTORY ||
+        path.join(repoRoot, "volforce_history.jsonl"),
 );
 
 const listenPort = Number(process.env.TRACKER_PROXY_PORT || 8080);
 const upstreamUrl = new URL(
     process.env.TRACKER_UPSTREAM || "http://ea.ryu7w7.xyz",
 );
+if (
+    !["http:", "https:"].includes(upstreamUrl.protocol) ||
+    (["localhost", "127.0.0.1", "[::1]", "0.0.0.0"].includes(
+        upstreamUrl.hostname.toLowerCase().replace(/\.$/, ""),
+    ) &&
+        Number(
+            upstreamUrl.port || (upstreamUrl.protocol === "https:" ? 443 : 80),
+        ) === listenPort)
+)
+    throw new Error(
+        "TRACKER_UPSTREAM must be an HTTP(S) server other than this proxy.",
+    );
 const scoreLogPath =
     process.env.TRACKER_SCORE_LOG || path.join(repoRoot, "score_log.txt");
 fs.mkdirSync(path.dirname(scoreLogPath), { recursive: true });
-const ryuRoot = process.env.RYUNET_ROOT;
-
-if (!ryuRoot) {
-    throw new Error(
-        "RYUNET_ROOT must point to the protocol decoder folder. Run setup.bat.",
-    );
-}
-
-const { KonmaiEncrypt } = require(
-    path.join(ryuRoot, "src/utils/KonmaiEncrypt"),
-);
-const LzKN = require(path.join(ryuRoot, "src/utils/LzKN")).default;
-const KBin = require(path.join(ryuRoot, "src/utils/KBinJSON"));
-const xmlParser = require(
-    path.join(ryuRoot, "node_modules", "fast-xml-parser"),
-);
+const { KonmaiEncrypt } = require("../utils/KonmaiEncrypt");
+const LzKN = require("../utils/LzKN").default;
+const KBin = require("../utils/KBinJSON");
+const xmlParser = require("fast-xml-parser");
 
 const gameRoot = path.resolve(repoRoot, "..");
 const musicDbPath = path.join(gameRoot, "data", "others", "music_db.xml");
@@ -130,7 +131,7 @@ function findTracks(value, result = []) {
 }
 
 function decodePayload(headers, raw) {
-    // Decoders operate on a copy; forwarding always retains the original bytes.
+    // Decoders operate on a copy, forwarding always retains the original bytes.
     let body = Buffer.from(raw);
     const compressed = String(headers["x-compress"] || "none");
     const contentType = String(headers["content-type"] || "");
@@ -496,8 +497,17 @@ function forwardingTarget(requestUrl) {
             target.origin,
         );
     }
+    // TRACKER_UPSTREAM can be the full bootstrap URL saved from Spice2x.
+    // Map our /service entry point to it instead of duplicating /service paths.
+    if (incoming.pathname === "/service" || incoming.pathname === "/service/") {
+        const target = new URL(upstreamUrl.href);
+        if (target.pathname === "/") target.pathname = "/service";
+        for (const [name, value] of incoming.searchParams)
+            target.searchParams.set(name, value);
+        return target;
+    }
     return new URL(
-        `${upstreamUrl.pathname.replace(/\/$/, "")}${incoming.pathname}${incoming.search}`,
+        `${incoming.pathname}${incoming.search}`,
         upstreamUrl.origin,
     );
 }

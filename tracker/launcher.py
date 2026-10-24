@@ -9,9 +9,10 @@ from pathlib import Path
 
 from .setup import (
     REPO_ROOT,
-    decoder_environment,
-    find_decoder_root,
+    RUNTIME_ROOT,
     node_tools,
+    probe_runtime,
+    runtime_environment,
 )
 
 
@@ -43,17 +44,20 @@ def prepare() -> tuple[list[list[str]], dict[str, str], Path]:
 
     if not MUSIC_DB_PATH.is_file():
         raise RuntimeError(
-            "music_db.xml was not found. Put SDVX7-Tracker-Proxy inside your game folder."
+            "music_db.xml was not found. Put the proxy folder inside your game folder."
         )
     node, _ = node_tools()
-    root = find_decoder_root(node)
-    if root is None:
-        raise RuntimeError("Protocol decoders are missing. Run setup.bat first.")
-    env = decoder_environment(root)
+    if not probe_runtime(node):
+        raise RuntimeError(
+            "Protocol utilities or dependencies are missing. Run setup.bat first."
+        )
+    env = runtime_environment()
     env.update(
         TRACKER_SCORE_LOG=str(SCORE_LOG_PATH),
         TRACKER_VOLFORCE_HISTORY=str(VOLFORCE_HISTORY_PATH),
     )
+    from tracker.spice import is_proxy_url, service_url
+
     try:
         port = int(env.get("TRACKER_PROXY_PORT", "8080"))
         if not 1 <= port <= 65535:
@@ -62,6 +66,13 @@ def prepare() -> tuple[list[list[str]], dict[str, str], Path]:
         raise RuntimeError(
             "TRACKER_PROXY_PORT must be a port between 1 and 65535."
         ) from None
+    try:
+        upstream = service_url(env.get("TRACKER_UPSTREAM") or "http://ea.ryu7w7.xyz")
+        if is_proxy_url(upstream, port):
+            raise ValueError("The upstream server cannot be the proxy itself.")
+        env["TRACKER_UPSTREAM"] = upstream
+    except ValueError as error:
+        raise RuntimeError(f"Invalid TRACKER_UPSTREAM: {error}") from None
     try:
         with socket.socket() as listener:
             if os.name == "nt":
@@ -75,11 +86,11 @@ def prepare() -> tuple[list[list[str]], dict[str, str], Path]:
         [
             node,
             "-r",
-            str(root / "node_modules/ts-node/register"),
+            str(RUNTIME_ROOT / "node_modules/ts-node/register"),
             str(REPO_ROOT / "proxy/ea_proxy.ts"),
         ],
     ]
-    return commands, env, root
+    return commands, env, RUNTIME_ROOT
 
 
 def stop(processes: list[subprocess.Popen]) -> None:

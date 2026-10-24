@@ -123,8 +123,10 @@ def configure() -> None:
     from config import (
         GAME_LOG_PATH,
         GAME_ROOT,
+        PLAYER_DATA_ROOT,
         PLAYTIME_STATE_PATH,
     )
+    from tracker.data import migrate_player_data
     from tracker.playtime import PlaytimeTracker, parse_playtime
     from tracker.spice import (
         SpiceConfig,
@@ -136,6 +138,7 @@ def configure() -> None:
     )
 
     ensure_spicecfg_closed()
+    migrate_player_data(REPO_ROOT, PLAYER_DATA_ROOT)
     env_path = REPO_ROOT / ".env"
     existing = dotenv_values(env_path)
     port = proxy_port(
@@ -169,6 +172,8 @@ def configure() -> None:
     if server == "ryunet":
         upstream = "http://ea.ryu7w7.xyz/service"
     else:
+        if server == "custom":
+            print("WARNING: Some data, such as total VolForce or the top 50, may not be correctly parsed by the proxy.")
         upstream = "http://127.0.0.1:8083" if server == "asphyxia" else ""
         if server == default_server and existing.get("TRACKER_SERVER") == server:
             upstream = saved_upstream or upstream
@@ -234,7 +239,7 @@ def configure() -> None:
     print(f"EA Service URL set to {local_url}")
     if backup is not None:
         print(f"Original Spice2x config backed up to {backup}")
-    print("Configuration saved.")
+    print("Configuration saved. You can run the proxy then the game.")
 
 
 def main() -> int:

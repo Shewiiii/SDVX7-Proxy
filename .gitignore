@@ -1,5 +1,6 @@
 .env
 cache/
+player-data/
 __pycache__/
 .venv/
 venv/

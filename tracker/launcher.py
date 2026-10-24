@@ -7,6 +7,7 @@ import sys
 import time
 from pathlib import Path
 
+from .data import migrate_player_data
 from .setup import (
     REPO_ROOT,
     RUNTIME_ROOT,
@@ -32,15 +33,12 @@ def prepare() -> tuple[list[list[str]], dict[str, str], Path]:
     # config loads this repository's .env, even when launched from another folder.
     from config import (
         MUSIC_DB_PATH,
+        PLAYER_DATA_ROOT,
         SCORE_LOG_PATH,
         VOLFORCE_HISTORY_PATH,
     )
 
-    for destination in (SCORE_LOG_PATH, VOLFORCE_HISTORY_PATH):
-        legacy_path = REPO_ROOT / "cache" / destination.name
-        if legacy_path.is_file() and not destination.exists():
-            destination.parent.mkdir(parents=True, exist_ok=True)
-            legacy_path.rename(destination)
+    migrate_player_data(REPO_ROOT, PLAYER_DATA_ROOT)
 
     if not MUSIC_DB_PATH.is_file():
         raise RuntimeError(

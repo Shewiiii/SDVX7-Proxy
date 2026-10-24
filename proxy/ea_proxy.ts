@@ -8,10 +8,11 @@ const fs = require("fs");
 const { TotalVolforceStore } = require("./total_volforce");
 const { ChartLevelStore } = require("./music_db");
 const repoRoot = path.resolve(__dirname, "..");
+const playerDataRoot = path.join(repoRoot, "player-data");
 const totalVolforce = new TotalVolforceStore(
     path.join(repoRoot, "cache", "total_volforce.json"),
     process.env.TRACKER_VOLFORCE_HISTORY ||
-        path.join(repoRoot, "volforce_history.jsonl"),
+        path.join(playerDataRoot, "volforce_history.jsonl"),
 );
 
 const listenPort = Number(process.env.TRACKER_PROXY_PORT || 8080);
@@ -31,7 +32,7 @@ if (
         "TRACKER_UPSTREAM must be an HTTP(S) server other than this proxy.",
     );
 const scoreLogPath =
-    process.env.TRACKER_SCORE_LOG || path.join(repoRoot, "score_log.txt");
+    process.env.TRACKER_SCORE_LOG || path.join(playerDataRoot, "score_log.jsonl");
 fs.mkdirSync(path.dirname(scoreLogPath), { recursive: true });
 const { KonmaiEncrypt } = require("../utils/KonmaiEncrypt");
 const LzKN = require("../utils/LzKN").default;

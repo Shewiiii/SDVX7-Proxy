@@ -54,9 +54,7 @@ def read_state(path: Path) -> dict:
         )
         or not isinstance(state.get("cursor"), dict)
     ):
-        raise ValueError(
-            "Invalid playtime history. Restore cache/playtime.json from backup."
-        )
+        raise ValueError(f"Invalid playtime history. Restore {path} from backup.")
     cursor = state["cursor"]
     if cursor:
         if (

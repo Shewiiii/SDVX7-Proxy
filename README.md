@@ -7,6 +7,8 @@ RyuNET's custom maps are supported.
 > [!NOTE]
 > A custom EA Service URL can be chosen, but some data returned by the server on card login, such as the saved chart data used to calculate VolForce, may not be correctly parsed by the proxy.
 
+This repository is a cleaned-up version of [SDVX ∇ VolForce Tracker](https://github.com/Shewiiii/SDVX7-VolForce-Tracker), meant for broader use.
+
 ## Requirements
 
 - Python 3.10+

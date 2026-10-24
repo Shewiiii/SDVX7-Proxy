@@ -1,5 +1,5 @@
 {
-  "name": "sdvx-tracker-decoders",
+  "name": "sdvx-proxy-decoders",
   "private": true,
   "description": "Only the dependencies used by RyuNET's protocol decoders",
   "dependencies": {

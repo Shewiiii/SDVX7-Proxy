@@ -68,7 +68,7 @@ def read_state(path: Path) -> dict:
     return state
 
 
-class PlaytimeTracker:
+class PlaytimeCollector:
     def __init__(self, log_path: str | Path, state_path: str | Path):
         self.log_path = Path(log_path)
         self.state_path = Path(state_path)

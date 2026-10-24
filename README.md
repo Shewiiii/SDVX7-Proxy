@@ -1,4 +1,4 @@
-# SDVX ∇ Tracker Proxy
+# SDVX ∇ Proxy
 
 Standalone proxy to intercept play data, for SOUND VOLTEX ∇, natively compatible with the RyuNET network and Asphyxia. Tested on KFC.
 
@@ -6,8 +6,6 @@ RyuNET's custom maps are supported.
 
 > [!NOTE]
 > A custom EA Service URL can be chosen, but some data returned by the server on card login, such as the saved chart data used to calculate VolForce, may not be correctly parsed by the proxy.
-
-This repository is a cleaned-up version of [SDVX ∇ VolForce Tracker](https://github.com/Shewiiii/SDVX7-VolForce-Tracker), meant for broader use.
 
 ## Requirements
 
@@ -18,8 +16,7 @@ This repository is a cleaned-up version of [SDVX ∇ VolForce Tracker](https://g
 
 Follow these steps only if you want to install the proxy alone.
 
-
-- Download the ZIP of this repository under Code, unzip it, and move `SDVX7-Tracker-Proxy-main/` folder into your game folder.
+- Download the ZIP of this repository under Code, unzip it, and move `SDVX7-Proxy-main/` folder into your game folder.
 - Run `setup.bat` and follow the instructions.
 - From now on, `run-proxy.bat` before starting the game. Otherwise, it will not connect to the network, but you can change back `EA Service URL` to your server URL at any point .
 
@@ -42,14 +39,12 @@ After in-game login and a play, you will find the following files in `player-dat
 - `score_log.jsonl` contains all the data the game sends to the E-Amusement server, with a new JSON entry added after each play.
 
 ```json
-// Example with S-CRITICAL enabled
-// When disabled, btfx_s_critical's value is always 0
 {
     "music_id": 1938,
-    "diff_idx": 2,
+    "diff_idx": 2, // 0: NOV, 1: ADV, 2: EXH, 3: INF/VVD, 4: MXM, 5: ULT
     "score": 9492028,
-    "clear_type": 2,
-    "score_grade": 6,
+    "clear_type": 2, // 0: No clear, 1: Crash, ..., 6: PUC
+    "score_grade": 6, // 0: S, ..., 9: D
     "exscore": 8075,
     "volforce": 340, // Chart VF / 1000
     "volforce_source": "updated",
@@ -63,7 +58,7 @@ After in-game login and a play, you will find the following files in `player-dat
         "s_critical": 2709
     },
     "raw_judgments": {
-        "btfx_s_critical": 449,
+        "btfx_s_critical": 449, // When S-CRITIAL is off, this value is always 0
         "critical_including_s_critical": 2949,
         "near": 175,
         "error": 75

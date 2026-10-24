@@ -63,7 +63,7 @@ def proxy_port(value: str) -> int:
             raise ValueError
         return port
     except ValueError:
-        raise ValueError("TRACKER_PROXY_PORT must be between 1 and 65535.") from None
+        raise ValueError("PROXY_PORT must be between 1 and 65535.") from None
 
 
 def is_proxy_url(value: str, port: int) -> bool:
@@ -94,7 +94,7 @@ def config_path(game_root: Path, override: str = "") -> Path:
     appdata = os.getenv("APPDATA")
     if not appdata:
         raise RuntimeError(
-            "Cannot locate Spice2x settings. Set TRACKER_SPICE_CONFIG to spicetools.xml."
+            "Cannot locate Spice2x settings. Set SPICE_CONFIG to spicetools.xml."
         )
     return Path(appdata) / "spicetools.xml"
 

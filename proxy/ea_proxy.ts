@@ -11,13 +11,13 @@ const repoRoot = path.resolve(__dirname, "..");
 const playerDataRoot = path.join(repoRoot, "player-data");
 const totalVolforce = new TotalVolforceStore(
     path.join(repoRoot, "cache", "total_volforce.json"),
-    process.env.TRACKER_VOLFORCE_HISTORY ||
+    process.env.VOLFORCE_HISTORY ||
         path.join(playerDataRoot, "volforce_history.jsonl"),
 );
 
-const listenPort = Number(process.env.TRACKER_PROXY_PORT || 8080);
+const listenPort = Number(process.env.PROXY_PORT || 8080);
 const upstreamUrl = new URL(
-    process.env.TRACKER_UPSTREAM || "http://ea.ryu7w7.xyz",
+    process.env.UPSTREAM || "http://ea.ryu7w7.xyz",
 );
 if (
     !["http:", "https:"].includes(upstreamUrl.protocol) ||
@@ -29,10 +29,10 @@ if (
         ) === listenPort)
 )
     throw new Error(
-        "TRACKER_UPSTREAM must be an HTTP(S) server other than this proxy.",
+        "UPSTREAM must be an HTTP(S) server other than this proxy.",
     );
 const scoreLogPath =
-    process.env.TRACKER_SCORE_LOG || path.join(playerDataRoot, "score_log.jsonl");
+    process.env.SCORE_LOG || path.join(playerDataRoot, "score_log.jsonl");
 fs.mkdirSync(path.dirname(scoreLogPath), { recursive: true });
 const { KonmaiEncrypt } = require("../utils/KonmaiEncrypt");
 const LzKN = require("../utils/LzKN").default;
@@ -413,7 +413,7 @@ function writeResults(decoded) {
 }
 
 const serviceTargets = new Map();
-const servicePrefix = "/__tracker/service/";
+const servicePrefix = "/__proxy/service/";
 
 function rewriteServicesResponse(requestUrl, body, headers) {
     if (
@@ -498,7 +498,7 @@ function forwardingTarget(requestUrl) {
             target.origin,
         );
     }
-    // TRACKER_UPSTREAM can be the full bootstrap URL saved from Spice2x.
+    // UPSTREAM can be the full bootstrap URL saved from Spice2x.
     // Map our /service entry point to it instead of duplicating /service paths.
     if (incoming.pathname === "/service" || incoming.pathname === "/service/") {
         const target = new URL(upstreamUrl.href);
@@ -635,7 +635,7 @@ const server = http.createServer((req, res) => {
 
 server.listen(listenPort, "127.0.0.1", () => {
     console.log(
-        `SDVX ∇ VolForce Tracker listening on http://127.0.0.1:${listenPort}`,
+        `SDVX ∇ Proxy listening on http://127.0.0.1:${listenPort}`,
     );
     console.log(`Forwarding to ${upstreamUrl.origin}`);
     console.log(`Writing results to ${scoreLogPath}`);

@@ -126,9 +126,14 @@ def configure() -> None:
         PLAYER_DATA_ROOT,
         PLAYTIME_STATE_PATH,
     )
-    from tracker.data import migrate_player_data
-    from tracker.playtime import PlaytimeTracker, parse_playtime
-    from tracker.spice import (
+    from proxy.data import migrate_player_data
+    from proxy.playtime import (
+        PlaytimeCollector,
+        format_playtime,
+        load_playtime_summary,
+        parse_playtime,
+    )
+    from proxy.spice import (
         SpiceConfig,
         config_path,
         ensure_spicecfg_closed,
@@ -142,19 +147,19 @@ def configure() -> None:
     env_path = REPO_ROOT / ".env"
     existing = dotenv_values(env_path)
     port = proxy_port(
-        os.getenv("TRACKER_PROXY_PORT") or existing.get("TRACKER_PROXY_PORT") or "8080"
+        os.getenv("PROXY_PORT") or existing.get("PROXY_PORT") or "8080"
     )
     local_url = f"http://127.0.0.1:{port}/service"
     spice_path = config_path(
         GAME_ROOT,
-        os.getenv("TRACKER_SPICE_CONFIG") or existing.get("TRACKER_SPICE_CONFIG") or "",
+        os.getenv("SPICE_CONFIG") or existing.get("SPICE_CONFIG") or "",
     )
     spice = SpiceConfig(spice_path)
     saved_upstream = (
-        os.getenv("TRACKER_UPSTREAM") or existing.get("TRACKER_UPSTREAM") or ""
+        os.getenv("UPSTREAM") or existing.get("UPSTREAM") or ""
     )
     default_server = (
-        (os.getenv("TRACKER_SERVER") or existing.get("TRACKER_SERVER") or "ryunet")
+        (os.getenv("SERVER") or existing.get("SERVER") or "ryunet")
         .strip()
         .lower()
     )
@@ -178,7 +183,7 @@ def configure() -> None:
                 " used to calculate VolForce, may not be correctly parsed by the proxy."
             )
         upstream = "http://127.0.0.1:8083" if server == "asphyxia" else ""
-        if server == default_server and existing.get("TRACKER_SERVER") == server:
+        if server == default_server and existing.get("SERVER") == server:
             upstream = saved_upstream or upstream
         upstream = prompt("EA server URL", upstream)
     while True:
@@ -192,48 +197,58 @@ def configure() -> None:
             upstream = prompt("EA server URL")
     print(f"Upstream EA server: {upstream}")
     print(f"Spice2x config: {spice_path}")
-    previous = existing.get("TRACKER_INITIAL_PLAYTIME") or "0"
+    previous = existing.get("INITIAL_PLAYTIME") or "0"
     try:
-        previous_seconds = parse_playtime(previous)
+        parse_playtime(previous)
     except ValueError:
-        previous_seconds = None
-    initial_playtime = previous if previous_seconds is not None else "0"
+        previous = "0"
+    baseline_seconds = int(existing.get("PLAYTIME_BASELINE_SECONDS") or "0")
+    baseline_plays = int(existing.get("PLAYTIME_BASELINE_PLAYS") or "0")
+    summary = load_playtime_summary(
+        PLAYTIME_STATE_PATH, previous, baseline_seconds, baseline_plays
+    )
+    current_seconds = summary["total_seconds"]
+    total_playtime = (
+        format_playtime(current_seconds).replace(",", "") if current_seconds else "0"
+    )
     while True:
-        initial_playtime = prompt(
-            "Starting playtime (2d 7h, 13h or 12h 30m)",
-            initial_playtime,
+        total_playtime = prompt(
+            "Total playtime (2d 7h, 13h or 12h 30m)", total_playtime
         )
         try:
-            initial_seconds = parse_playtime(initial_playtime)
+            total_seconds = parse_playtime(total_playtime)
             break
         except ValueError as error:
             print(error)
-            initial_playtime = "0"
+            total_playtime = (
+                format_playtime(current_seconds).replace(",", "")
+                if current_seconds else "0"
+            )
 
-    playtime_settings = {"TRACKER_INITIAL_PLAYTIME": initial_playtime}
-    same_initial = (
-        previous_seconds == initial_seconds
-        and existing.get("TRACKER_PLAYTIME_BASELINE_SECONDS") is not None
-        and existing.get("TRACKER_PLAYTIME_BASELINE_PLAYS") is not None
-    )
-    if not same_initial:
-        checkpoint = {"seconds": 0, "plays": 0}
-        if initial_seconds:
-            checkpoint = PlaytimeTracker(
-                GAME_LOG_PATH, PLAYTIME_STATE_PATH
-            ).checkpoint()
+    # Keeping the displayed total keeps its original baseline: migrated local
+    # time must not also be imported as starting time and counted twice.
+    playtime_settings = {
+        "INITIAL_PLAYTIME": previous,
+        "PLAYTIME_BASELINE_SECONDS": str(baseline_seconds),
+        "PLAYTIME_BASELINE_PLAYS": str(baseline_plays),
+    }
+    if total_seconds != current_seconds:
+        checkpoint = PlaytimeCollector(
+            GAME_LOG_PATH, PLAYTIME_STATE_PATH
+        ).checkpoint()
         playtime_settings.update(
-            TRACKER_PLAYTIME_BASELINE_SECONDS=str(checkpoint["seconds"]),
-            TRACKER_PLAYTIME_BASELINE_PLAYS=str(checkpoint["plays"]),
+            INITIAL_PLAYTIME=total_playtime,
+            PLAYTIME_BASELINE_SECONDS=str(checkpoint["seconds"]),
+            PLAYTIME_BASELINE_PLAYS=str(checkpoint["plays"]),
         )
 
     ensure_spicecfg_closed()
     # Save the upstream before redirecting the game, so reruns cannot lose it.
     settings = {
-        "TRACKER_SERVER": server,
-        "TRACKER_UPSTREAM": upstream,
-        "TRACKER_PROXY_PORT": str(port),
-        "TRACKER_SPICE_CONFIG": str(spice_path),
+        "SERVER": server,
+        "UPSTREAM": upstream,
+        "PROXY_PORT": str(port),
+        "SPICE_CONFIG": str(spice_path),
         **playtime_settings,
     }
     for key, value in settings.items():
@@ -247,9 +262,14 @@ def configure() -> None:
 
 def main() -> int:
     try:
+        from proxy.data import migrate_player_data
+
+        # This only needs the standard library, so preserve old data even before
+        # installing dependencies or starting the configuration prompts.
+        migrate_player_data(REPO_ROOT, REPO_ROOT / "player-data")
         python = install()
         run(
-            [str(python), "-c", "from tracker.setup import configure; configure()"],
+            [str(python), "-c", "from proxy.setup import configure; configure()"],
             cwd=REPO_ROOT,
         )
         return 0

@@ -16,5 +16,4 @@ runtime/*
 !runtime/tsconfig.json
 !runtime/requirements.txt
 .vscode
-/SDVX7-Tracker-Dashboard-main/
 asphyxia-core-win-x64/

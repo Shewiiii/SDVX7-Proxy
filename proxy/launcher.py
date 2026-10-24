@@ -51,26 +51,26 @@ def prepare() -> tuple[list[list[str]], dict[str, str], Path]:
         )
     env = runtime_environment()
     env.update(
-        TRACKER_SCORE_LOG=str(SCORE_LOG_PATH),
-        TRACKER_VOLFORCE_HISTORY=str(VOLFORCE_HISTORY_PATH),
+        SCORE_LOG=str(SCORE_LOG_PATH),
+        VOLFORCE_HISTORY=str(VOLFORCE_HISTORY_PATH),
     )
-    from tracker.spice import is_proxy_url, service_url
+    from proxy.spice import is_proxy_url, service_url
 
     try:
-        port = int(env.get("TRACKER_PROXY_PORT", "8080"))
+        port = int(env.get("PROXY_PORT", "8080"))
         if not 1 <= port <= 65535:
             raise ValueError
     except ValueError:
         raise RuntimeError(
-            "TRACKER_PROXY_PORT must be a port between 1 and 65535."
+            "PROXY_PORT must be a port between 1 and 65535."
         ) from None
     try:
-        upstream = service_url(env.get("TRACKER_UPSTREAM") or "http://ea.ryu7w7.xyz")
+        upstream = service_url(env.get("UPSTREAM") or "http://ea.ryu7w7.xyz")
         if is_proxy_url(upstream, port):
             raise ValueError("The upstream server cannot be the proxy itself.")
-        env["TRACKER_UPSTREAM"] = upstream
+        env["UPSTREAM"] = upstream
     except ValueError as error:
-        raise RuntimeError(f"Invalid TRACKER_UPSTREAM: {error}") from None
+        raise RuntimeError(f"Invalid UPSTREAM: {error}") from None
     try:
         with socket.socket() as listener:
             if os.name == "nt":
@@ -109,9 +109,9 @@ def main() -> int:
         commands, env, root = prepare()
         next_poll = 0.0
         from config import GAME_LOG_PATH, PLAYTIME_STATE_PATH, PULLING_RATE
-        from tracker.playtime import PlaytimeTracker
+        from proxy.playtime import PlaytimeCollector
 
-        playtime = PlaytimeTracker(GAME_LOG_PATH, PLAYTIME_STATE_PATH)
+        playtime = PlaytimeCollector(GAME_LOG_PATH, PLAYTIME_STATE_PATH)
         print(
             "Starting the proxy. Keep this window open.",
             flush=True,

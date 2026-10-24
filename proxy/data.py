@@ -2,7 +2,7 @@ from pathlib import Path
 
 
 def migrate_player_data(repo_root: Path, player_data_root: Path) -> None:
-    # From VF tracker's structure
+    # From the original project's structure
     sources = (
         (repo_root / "score_log.txt", player_data_root / "score_log.jsonl"),
         (

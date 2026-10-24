@@ -1,6 +1,6 @@
 # SDVX ∇ Proxy
 
-Standalone proxy to intercept play data, for SOUND VOLTEX ∇, natively compatible with the RyuNET network and Asphyxia. Tested on KFC.
+Standalone proxy to intercept play data from SOUND VOLTEX ∇, natively compatible with the RyuNET network and Asphyxia. Tested on KFC.
 
 RyuNET's custom maps are supported.
 

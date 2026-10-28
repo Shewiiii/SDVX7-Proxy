@@ -5,12 +5,13 @@ const https = require("https");
 const path = require("path");
 const querystring = require("querystring");
 const fs = require("fs");
-const { TotalVolforceStore } = require("./total_volforce");
+const { ServerDataStore } = require("./server_data");
+const { captureRadarProbe } = require("./radar_probe");
 const { ChartLevelStore } = require("./music_db");
 const repoRoot = path.resolve(__dirname, "..");
 const playerDataRoot = path.join(repoRoot, "player-data");
-const totalVolforce = new TotalVolforceStore(
-    path.join(playerDataRoot, "total_volforce.json"),
+const serverData = new ServerDataStore(
+    path.join(playerDataRoot, "server_data.json"),
     process.env.VOLFORCE_HISTORY ||
         path.join(playerDataRoot, "volforce_history.jsonl"),
 );
@@ -572,10 +573,16 @@ const server = http.createServer((req, res) => {
                                 upstreamResponse.headers,
                                 upstreamBody,
                             ).data;
+                            captureRadarProbe(
+                                playerDataRoot,
+                                decodedRequest.route,
+                                decodedRequest.data,
+                                response.response?.game,
+                            );
                             const refid =
                                 field(decodedRequest.data, "refid") ||
                                 field(decodedRequest.data, "dataid");
-                            totalVolforce.capture(
+                            serverData.capture(
                                 decodedRequest.route,
                                 refid,
                                 response.response?.game,

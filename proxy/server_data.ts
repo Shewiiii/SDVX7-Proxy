@@ -3,8 +3,10 @@
 import fs = require("node:fs");
 import path = require("node:path");
 import crypto = require("node:crypto");
+const { profileData, chartRecord } = require("./server_fields");
 
-interface TotalVolforceSnapshot {
+interface ServerDataSnapshot {
+    version?: 1;
     source: "sv7_load_m";
     profile_id: string;
     captured_at: string;
@@ -15,6 +17,11 @@ interface TotalVolforceSnapshot {
     chart_records?: Record<string, { score: number; clear_type: number }>;
     player?: Record<string, string | number>;
     player_updated_at?: string;
+    profile_data_captured_at?: string;
+    profile_data_updated_at?: string;
+    profile_options?: Record<string, number>;
+    profile_parameters?: { type: number; id: number; param: number[] }[];
+    variant_gate?: Record<string, unknown>;
 }
 
 interface ChartInfo {
@@ -33,18 +40,18 @@ type FieldReader = (node: ProtocolNode, name: string) => unknown;
 // Ryu7w7/asphyxia_plugins, handlers/profiles.ts: sv7_load_m uses 26 u32s
 // per chart. Slots 0/1 identify the chart, slot 11 is its saved best VF,
 // including the previous-version fallback supplied by the server.
-export class TotalVolforceStore {
+export class ServerDataStore {
     private readonly filename: string;
     private readonly historyFilename: string;
-    state: TotalVolforceSnapshot | undefined;
-    private pendingPlayers = new Map<string, Record<string, string | number>>();
+    state: ServerDataSnapshot | undefined;
+    private pendingProfiles = new Map<string, Partial<ServerDataSnapshot>>();
 
     constructor(filename: string, historyFilename: string) {
         this.filename = filename;
         this.historyFilename = historyFilename;
         this.state = undefined;
         try {
-            const state: TotalVolforceSnapshot = JSON.parse(
+            const state: ServerDataSnapshot = JSON.parse(
                 fs.readFileSync(filename, "utf8"),
             );
             if (
@@ -62,7 +69,7 @@ export class TotalVolforceStore {
                         value < 0,
                 )
             )
-                throw new Error("Invalid Total VolForce snapshot");
+                throw new Error("Invalid server data snapshot");
             this.state = state;
             // An older cache provides one known observation, not a past timeline.
             if (
@@ -73,10 +80,7 @@ export class TotalVolforceStore {
         } catch (caught) {
             const error = caught as NodeJS.ErrnoException;
             if (error.code !== "ENOENT")
-                console.warn(
-                    "Cannot read Total VolForce cache:",
-                    error.message,
-                );
+                console.warn("Cannot read server data:", error.message);
         }
     }
 
@@ -111,53 +115,31 @@ export class TotalVolforceStore {
             return;
         }
         if (route === "game.sv7_save") {
-            if (!this.state?.player || !requestData) return;
-            const raw = field(requestData, "appeal_id");
-            if (raw == null || raw === "") return;
-            const appeal = Number(raw);
-            if (!Number.isSafeInteger(appeal) || appeal < 0) return;
-            this.persist({
-                ...this.state,
-                player: { ...this.state.player, appeal_id: appeal },
-            });
+            if (!requestData) return;
+            const previous = this.state || this.pendingProfiles.get(profile);
+            if (!previous) return;
+            const data = profileData(requestData, field, previous, true);
+            if (this.state) {
+                this.persist({ ...this.state, ...data });
+            } else {
+                this.pendingProfiles.set(profile, data);
+            }
             return;
         }
         if (route === "game.sv7_load") {
-            // Only retain displayed account fields, never card IDs or authentication data.
+            // Retain selected game data, excluding card IDs and authentication.
             if (Number(field(response, "result")) !== 0) return;
-            const player: Record<string, string | number> = {};
-            for (const key of ["name", "code", "sdvx_id"]) {
-                const value = field(response, key);
-                if (typeof value === "string" && value.trim())
-                    player[key] = value.slice(0, 100);
-            }
-            for (const key of [
-                "skill_level",
-                "gamecoin_packet",
-                "gamecoin_block",
-                "blaster_energy",
-                "appeal_id",
-            ]) {
-                const raw = field(response, key);
-                if (raw == null || raw === "") continue;
-                const value = Number(raw);
-                if (Number.isSafeInteger(value) && value >= 0)
-                    player[key] = value;
-            }
-            if (!player.name) return;
+            const data = profileData(response, field);
+            if (!data.player.name) return;
             if (this.state) {
-                this.persist({
-                    ...this.state,
-                    player,
-                    player_updated_at: new Date().toISOString(),
-                });
+                this.persist({ ...this.state, ...data });
             } else {
-                this.pendingPlayers.set(profile, player);
+                this.pendingProfiles.set(profile, data);
             }
             return;
         }
         let charts: Record<string, number>;
-        let records: NonNullable<TotalVolforceSnapshot["chart_records"]>;
+        let records: NonNullable<ServerDataSnapshot["chart_records"]>;
         if (route === "game.sv7_load_m") {
             if (!response.music || typeof response.music !== "object") return;
             charts = {};
@@ -185,25 +167,22 @@ export class TotalVolforceStore {
                     );
                 const key = `${mid}:${difficulty}`;
                 charts[key] = Math.max(charts[key] || 0, vf);
-                // The previous-version score/clear is supplied in slots 12/14.
-                const previous = param[2] === 0 && param[4] === 0;
-                const score = param[previous ? 12 : 2];
-                const clear = param[previous ? 14 : 4];
-                if (
-                    Number.isSafeInteger(score) &&
-                    score >= 0 &&
-                    score <= 10000000 &&
-                    Number.isSafeInteger(clear) &&
-                    clear >= 0 &&
-                    clear <= 6
-                ) {
+                const saved = chartRecord(param);
+                const old = records[key];
+                if (old) {
+                    const best = saved.score >= old.score ? saved : old;
                     records[key] = {
-                        score: Math.max(records[key]?.score || 0, score),
-                        clear_type: Math.max(
-                            records[key]?.clear_type || 0,
-                            clear,
+                        ...best,
+                        score: Math.max(old.score, saved.score),
+                        exscore: Math.max(old.exscore || 0, saved.exscore),
+                        clear_type: Math.max(old.clear_type, saved.clear_type),
+                        score_grade: Math.max(
+                            old.score_grade || 0,
+                            saved.score_grade,
                         ),
                     };
+                } else {
+                    records[key] = saved;
                 }
             }
         } else {
@@ -250,7 +229,54 @@ export class TotalVolforceStore {
                     Number(clear) >= 0 &&
                     Number(clear) <= 6
                 ) {
+                    const old = records[key] || {};
+                    const updated = { ...old };
+                    const exscore = field(track, "exscore");
+                    if (
+                        exscore != null &&
+                        exscore !== "" &&
+                        Number.isSafeInteger(Number(exscore)) &&
+                        Number(exscore) >= 0
+                    ) {
+                        updated.exscore = Math.max(
+                            old.exscore || 0,
+                            Number(exscore),
+                        );
+                    }
+                    const grade = field(track, "score_grade");
+                    if (
+                        grade != null &&
+                        grade !== "" &&
+                        Number.isSafeInteger(Number(grade)) &&
+                        Number(grade) >= 0
+                    ) {
+                        updated.score_grade = Math.max(
+                            old.score_grade || 0,
+                            Number(grade),
+                        );
+                    }
+                    if (
+                        !Number.isSafeInteger(old.score) ||
+                        Number(score) > old.score
+                    ) {
+                        for (const name of [
+                            "btn_rate",
+                            "long_rate",
+                            "vol_rate",
+                        ]) {
+                            const raw = field(track, name);
+                            if (
+                                raw != null &&
+                                raw !== "" &&
+                                Number.isSafeInteger(Number(raw)) &&
+                                Number(raw) >= 0
+                            ) {
+                                updated[name] = Number(raw);
+                            }
+                        }
+                    }
                     records[key] = {
+                        ...updated,
                         score: Math.max(
                             records[key]?.score || 0,
                             Number(score),
@@ -267,8 +293,9 @@ export class TotalVolforceStore {
         }
         const values = Object.values(charts).sort((a, b) => b - a);
         const now = new Date().toISOString();
-        const state: TotalVolforceSnapshot = {
+        const state: ServerDataSnapshot = {
             ...this.state,
+            version: 1,
             source: "sv7_load_m",
             profile_id: profile,
             captured_at:
@@ -281,20 +308,17 @@ export class TotalVolforceStore {
                 .slice(0, 50)
                 .reduce((sum, vf) => sum + vf, 0),
         };
-        const player = this.pendingPlayers.get(profile);
-        if (player) {
-            state.player = player;
-            state.player_updated_at = now;
-        }
+        const pending = this.pendingProfiles.get(profile);
+        if (pending) Object.assign(state, pending);
         this.persist(state);
         this.recordHistory(state);
-        this.pendingPlayers.clear();
+        this.pendingProfiles.clear();
         console.log(
             `Total VolForce: ${(state.total_volforce / 1000).toFixed(3)} (${values.length} saved charts)`,
         );
     }
 
-    private recordHistory(state: TotalVolforceSnapshot): void {
+    private recordHistory(state: ServerDataSnapshot): void {
         const best = Object.values(state.chart_volforce)
             .sort((a, b) => b - a)
             .slice(0, 50);
@@ -323,7 +347,7 @@ export class TotalVolforceStore {
         }
     }
 
-    private persist(state: TotalVolforceSnapshot): void {
+    private persist(state: ServerDataSnapshot): void {
         fs.mkdirSync(path.dirname(this.filename), { recursive: true });
         const temporary = this.filename + ".tmp";
         fs.writeFileSync(temporary, JSON.stringify(state) + "\n", "utf8");

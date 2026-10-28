@@ -12,7 +12,7 @@ def migrate_player_data(repo_root: Path, player_data_root: Path) -> None:
         (repo_root / "cache" / "playtime.json", player_data_root / "playtime.json"),
         (
             repo_root / "cache" / "total_volforce.json",
-            player_data_root / "total_volforce.json",
+            player_data_root / "server_data.json",
         ),
     )
     for source, destination in sources:

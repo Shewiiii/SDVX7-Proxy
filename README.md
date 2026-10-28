@@ -90,24 +90,90 @@ After in-game login and a play, you will find the following files in `player-dat
 }
 ```
 
-- `total_volforce.json` stores the player profile, with their VolForce and scores for the charts in the top 50.  
-  This data is sent by the E-Amusement server (RyuNET or Asphyxia here) after the player logs into the game with their E-Amusement card.
+- `total_volforce.json` stores all the data sent by the E-Amusement server (RyuNET or Asphyxia here) on E-Amusement card login.
 
 ```json
 {
+    "version": 1,
     "source": "sv7_load_m",
     "profile_id": "...",
-    "captured_at": "2026-10-22T12:44:15.355Z",
-    "updated_at": "2026-10-22T12:44:15.355Z",
-    "chart_volforce": { "1938:2": 340 },
+    "captured_at": "2026-10-28T23:11:14.683Z",
+    "updated_at": "2026-10-28T23:13:42.425Z",
+    "chart_volforce": {
+        "1938:2": 340
+    },
     "chart_records": {
         "1938:2": {
             "score": 9492028,
-            "clear_type": 2
+            "exscore": 8075,
+            "clear_type": 2,
+            "score_grade": 6,
+            "btn_rate": 9,
+            "long_rate": 10,
+            "vol_rate": 9
         }
     },
     "chart_count": 1,
-    "total_volforce": 340
+    "total_volforce": 340,
+    "player": {
+        "name": "PLAYER",
+        "code": "12345678",
+        "sdvx_id": "12345678",
+        "skill_level": 6,
+        "gamecoin_packet": 10000,
+        "gamecoin_block": 5000,
+        "blaster_energy": 100,
+        "appeal_id": 1
+    },
+    "player_updated_at": "2026-10-28T23:11:13.817Z",
+    "profile_data_captured_at": "2026-10-28T23:11:13.817Z",
+    "profile_data_updated_at": "2026-10-28T23:13:42.425Z",
+    "profile_options": {
+        "last_music_id": 1938,
+        "last_music_type": 2,
+        "sort_type": 0,
+        "headphone": 0,
+        "hispeed": 400,
+        "lanespeed": 700,
+        "gauge_option": 0,
+        "ars_option": 0,
+        "notes_option": 0,
+        "early_late_disp": 0,
+        "draw_adjust": 0,
+        "eff_c_left": 0,
+        "eff_c_right": 0,
+        "narrow_down": 0
+    },
+    "profile_parameters": [
+        {
+            "type": 2,
+            "id": 1,
+            "param": [
+                0,
+                1,
+                0
+            ]
+        }
+    ],
+    "variant_gate": {
+        "power": 50000,
+        "element": {
+            "notes": 455,
+            "peak": 542,
+            "tsumami": 207,
+            "tricky": 224,
+            "onehand": 266,
+            "handtrip": 77
+        },
+        "over_radar": [
+            1,
+            0,
+            4,
+            3,
+            2,
+            5
+        ]
+    }
 }
 ```
 

@@ -10,6 +10,10 @@ def migrate_player_data(repo_root: Path, player_data_root: Path) -> None:
             player_data_root / "volforce_history.jsonl",
         ),
         (repo_root / "cache" / "playtime.json", player_data_root / "playtime.json"),
+        (
+            repo_root / "cache" / "total_volforce.json",
+            player_data_root / "total_volforce.json",
+        ),
     )
     for source, destination in sources:
         if source.is_file() and not destination.exists():

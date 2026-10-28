@@ -90,6 +90,27 @@ After in-game login and a play, you will find the following files in `player-dat
 }
 ```
 
+- `total_volforce.json` stores the player profile, with their VolForce and scores for the charts in the top 50.  
+  This data is sent by the E-Amusement server (RyuNET or Asphyxia here) after the player logs into the game with their E-Amusement card.
+
+```json
+{
+    "source": "sv7_load_m",
+    "profile_id": "...",
+    "captured_at": "2026-10-22T12:44:15.355Z",
+    "updated_at": "2026-10-22T12:44:15.355Z",
+    "chart_volforce": { "1938:2": 340 },
+    "chart_records": {
+        "1938:2": {
+            "score": 9492028,
+            "clear_type": 2
+        }
+    },
+    "chart_count": 1,
+    "total_volforce": 340
+}
+```
+
 ## Credits
 
 - E-Amusement decoding utils from [RyuNET-core](https://github.com/Ryu7w7/RyuNET-core)

@@ -10,7 +10,7 @@ const { ChartLevelStore } = require("./music_db");
 const repoRoot = path.resolve(__dirname, "..");
 const playerDataRoot = path.join(repoRoot, "player-data");
 const totalVolforce = new TotalVolforceStore(
-    path.join(repoRoot, "cache", "total_volforce.json"),
+    path.join(playerDataRoot, "total_volforce.json"),
     process.env.VOLFORCE_HISTORY ||
         path.join(playerDataRoot, "volforce_history.jsonl"),
 );

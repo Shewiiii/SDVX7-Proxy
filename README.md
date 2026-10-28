@@ -110,7 +110,8 @@ After in-game login and a play, you will find the following files in `player-dat
             "score_grade": 6,
             "btn_rate": 9,
             "long_rate": 10,
-            "vol_rate": 9
+            "vol_rate": 9,
+            "score_source": "current_version"
         }
     },
     "chart_count": 1,

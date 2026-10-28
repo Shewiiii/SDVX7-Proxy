@@ -256,9 +256,12 @@ export class ServerDataStore {
                         );
                     }
                     if (
-                        !Number.isSafeInteger(old.score) ||
-                        Number(score) > old.score
+                        old.score_source !== "current_version" ||
+                        Number(score) > (old.score || 0)
                     ) {
+                        Object.assign(updated, {
+                            score_source: "current_version",
+                        });
                         for (const name of [
                             "btn_rate",
                             "long_rate",

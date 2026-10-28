@@ -163,6 +163,7 @@ function chartRecord(param) {
         exscore: param[previous ? 13 : 3],
         clear_type: param[previous ? 14 : 4],
         score_grade: param[previous ? 15 : 5],
+        score_source: previous ? "previous_version" : "current_version",
         btn_rate: param[8],
         long_rate: param[9],
         vol_rate: param[10],

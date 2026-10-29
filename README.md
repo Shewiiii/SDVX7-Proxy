@@ -149,11 +149,7 @@ After in-game login and a play, you will find the following files in `player-dat
         {
             "type": 2,
             "id": 1,
-            "param": [
-                0,
-                1,
-                0
-            ]
+            "param": [0, 1, 0]
         }
     ],
     "variant_gate": {
@@ -166,14 +162,7 @@ After in-game login and a play, you will find the following files in `player-dat
             "onehand": 266,
             "handtrip": 77
         },
-        "over_radar": [
-            1,
-            0,
-            4,
-            3,
-            2,
-            5
-        ]
+        "over_radar": [1, 0, 4, 3, 2, 5]
     }
 }
 ```
@@ -181,3 +170,4 @@ After in-game login and a play, you will find the following files in `player-dat
 ## Credits
 
 - E-Amusement decoding utils from [RyuNET-core](https://github.com/Ryu7w7/RyuNET-core)
+- [asphyxia_plugins](https://github.com/22vv0/asphyxia_plugins) for the overall understanding of the game and server requests

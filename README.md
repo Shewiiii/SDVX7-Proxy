@@ -78,7 +78,7 @@ After in-game login and a play, you will find the following files in `player-dat
 }
 ```
 
-- `volforce_history.jsonl` stores timestamped total VolForce and worst chart VF in top 50, in thousandths, with a new JSON entry added after each play.
+- `volforce_history.jsonl` stores timestamped total VolForce and the minimum chart VF needed to enter the Best 50, both in thousandths, with a new JSON entry added after each play.
 
 ```json
 {
@@ -86,7 +86,7 @@ After in-game login and a play, you will find the following files in `player-dat
     "profile_id": "...",
     "total_volforce": 16918,
     "minimum_volforce": 326,
-    "top_count": 50
+    "best50_count": 50
 }
 ```
 

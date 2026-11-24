@@ -331,7 +331,7 @@ export class ServerDataStore {
             total_volforce: best.reduce((sum, vf) => sum + vf, 0),
             // VF uses integer thousandths: exceeding the 50th chart needs +1.
             minimum_volforce: best.length === 50 ? best[49] + 1 : null,
-            top_count: best.length,
+            best50_count: best.length,
         };
         try {
             fs.mkdirSync(path.dirname(this.historyFilename), {

@@ -167,6 +167,25 @@ After in-game login and a play, you will find the following files in `player-dat
 }
 ```
 
+- `playtime.json` stores active playtime data, which is when the player is playing a chart. This is obtained by listening to `Attach` and `Detach` events of `ALTERNATIVE_GAME_SCENE` or `GAME_SCENE` in stdout.
+
+```json
+{
+    "version": 1,
+    "seconds": 117023,
+    "plays": 783,
+    "cursor": { // Cursor in the log
+        "generation": "ad281b40b...",
+        "offset": 2176968,
+        "pending": null // Contains the Attach event timestamp if waiting for a Detach event
+    },
+    "daily_seconds": {
+        "2026-11-25": 4204,
+        "2026-11-26": 2667
+    }
+}
+```
+
 ## Credits
 
 - E-Amusement decoding utils from [RyuNET-core](https://github.com/Ryu7w7/RyuNET-core)

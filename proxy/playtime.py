@@ -5,14 +5,27 @@ import json
 import os
 import re
 import tempfile
+from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import date, datetime, time, timedelta
 from pathlib import Path
+from typing import TypedDict
 
 SCENE_EVENT = re.compile(
     r"^\[(\d{4}/\d{2}/\d{2} \d{2}:\d{2}:\d{2})\] "
     r"I:(Attach|Detach): in (?:ALTERNATIVE_GAME_SCENE|GAME_SCENE)$"
 )
+
+
+class PlaytimeTotals(TypedDict):
+    total_seconds: int
+    initial_seconds: int
+    local_seconds: int
+    plays: int
+
+
+class PlaytimeSummary(PlaytimeTotals, total=False):
+    daily_seconds: dict[str, int]
 
 
 def parse_playtime(value: str) -> int:
@@ -65,11 +78,34 @@ def read_state(path: Path) -> dict:
             raise ValueError("Invalid playtime log cursor.")
         if cursor.get("pending") is not None:
             datetime.strptime(cursor["pending"], "%Y/%m/%d %H:%M:%S")
+    daily = state.get("daily_seconds", {})
+    if not isinstance(daily, dict) or any(
+        not valid_daily_total(day, seconds) for day, seconds in daily.items()
+    ):
+        raise ValueError("Invalid daily playtime history")
     return state
 
 
+def valid_daily_total(day: str, seconds: object) -> bool:
+    try:
+        canonical = date.fromisoformat(day).isoformat()
+    except ValueError:
+        return False
+    return canonical == day and type(seconds) is int and seconds > 0
+
+
+def add_daily_playtime(totals: dict[str, int], start: datetime, end: datetime) -> None:
+    while start < end:
+        stop = end
+        if start.date() < end.date():
+            stop = datetime.combine(start.date() + timedelta(days=1), time.min)
+        day = start.date().isoformat()
+        totals[day] = totals.get(day, 0) + int((stop - start).total_seconds())
+        start = stop
+
+
 class PlaytimeCollector:
-    def __init__(self, log_path: str | Path, state_path: str | Path):
+    def __init__(self, log_path: str | Path, state_path: str | Path) -> None:
         self.log_path = Path(log_path)
         self.state_path = Path(state_path)
 
@@ -87,7 +123,7 @@ class PlaytimeCollector:
             return state
 
     @contextmanager
-    def _lock(self):
+    def _lock(self) -> Iterator[None]:
         # Serialize setup and collectors, including accidentally duplicated launches.
         self.state_path.parent.mkdir(parents=True, exist_ok=True)
         with self.state_path.with_suffix(".lock").open("a+b") as stream:
@@ -151,6 +187,7 @@ class PlaytimeCollector:
                 if event == "Attach":
                     # A second start abandons an interval whose end is missing.
                     cursor["pending"] = stamp
+                # Detach, cursor.get("pending") contains timestamp str, or None if cleared
                 elif cursor.get("pending"):
                     start = datetime.strptime(cursor["pending"], "%Y/%m/%d %H:%M:%S")
                     seconds = int((timestamp - start).total_seconds())
@@ -158,6 +195,9 @@ class PlaytimeCollector:
                     if seconds > 0:
                         state["seconds"] += seconds
                         state["plays"] += 1
+                        add_daily_playtime(
+                            state.setdefault("daily_seconds", {}), start, timestamp
+                        )
             changed = cursor["offset"] != offset
             # The game may recreate the log while we read it. Retry that run later.
             stream.seek(0)
@@ -194,15 +234,18 @@ def load_playtime_summary(
     initial: str = "0",
     baseline_seconds: int = 0,
     baseline_plays: int = 0,
-) -> dict:
+) -> PlaytimeSummary:
     state = read_state(Path(path))
     if baseline_seconds < 0 or baseline_plays < 0:
         raise ValueError("Playtime checkpoints must be nonnegative.")
     imported = parse_playtime(initial)
     local = max(0, state["seconds"] - baseline_seconds)
-    return {
+    summary: PlaytimeSummary = {
         "total_seconds": imported + local,
         "initial_seconds": imported,
         "local_seconds": local,
         "plays": max(0, state["plays"] - baseline_plays),
     }
+    if state.get("daily_seconds"):
+        summary["daily_seconds"] = state["daily_seconds"]
+    return summary

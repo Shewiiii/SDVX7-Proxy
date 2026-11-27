@@ -3,7 +3,11 @@
 import fs = require("node:fs");
 import path = require("node:path");
 import crypto = require("node:crypto");
-const { profileData, chartRecord } = require("./server_fields");
+const {
+    profileData,
+    chartRecord,
+    isSkillAnalyzerMode,
+} = require("./server_fields");
 
 interface ServerDataSnapshot {
     version?: 1;
@@ -191,6 +195,8 @@ export class ServerDataStore {
             records = { ...this.state.chart_records };
             let receivedBest = false;
             for (const track of tracks) {
+                // Course stages are logged as plays but never update the saved chart record
+                if (isSkillAnalyzerMode(field(track, "mode"))) continue;
                 const mid = field(track, "music_id");
                 const difficulty = field(track, "music_type");
                 const raw = field(track, "volforce");

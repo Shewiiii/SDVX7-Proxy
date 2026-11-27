@@ -189,4 +189,8 @@ function chartRecord(param) {
     return record;
 }
 
-module.exports = { profileData, chartRecord, integers };
+function isSkillAnalyzerMode(mode: unknown): boolean {
+    return mode === 2 || mode === "2";
+}
+
+module.exports = { profileData, chartRecord, integers, isSkillAnalyzerMode };

@@ -6,6 +6,7 @@ const path = require("path");
 const querystring = require("querystring");
 const fs = require("fs");
 const { ServerDataStore } = require("./server_data");
+const { isSkillAnalyzerMode } = require("./server_fields");
 const { captureRadarProbe } = require("./radar_probe");
 const { ChartLevelStore } = require("./music_db");
 const repoRoot = path.resolve(__dirname, "..");
@@ -59,7 +60,7 @@ const chartLevelStore = new ChartLevelStore(musicDbPaths, (raw) => {
 });
 chartLevelStore.refresh();
 
-function calculatePlayVolforce(level, score, clearType) {
+function calculatePlayVolforce(level, score, clearType, skillAnalyzer) {
     const grades = [
         [9900000, 105],
         [9800000, 102],
@@ -74,13 +75,17 @@ function calculatePlayVolforce(level, score, clearType) {
     ];
     const clears = { 1: 50, 2: 100, 3: 102, 4: 104, 5: 106, 6: 110 };
     if (
-        !Number.isFinite(level) ||
-        level <= 0 ||
         !Number.isSafeInteger(score) ||
         score < 0 ||
         score > 10000000 ||
-        !(clearType in clears)
+        !Number.isInteger(clearType) ||
+        clearType < 0 ||
+        clearType > 6
     )
+        return undefined;
+    // Skill Analyzer stages retain their reported score and clear type but award no Play VF
+    if (skillAnalyzer) return 0;
+    if (!Number.isFinite(level) || level <= 0 || clearType === 0)
         return undefined;
     const grade = grades.find(([threshold]) => score >= threshold)[1];
     // Integer arithmetic avoids floating-point errors at truncation boundaries.
@@ -316,7 +321,12 @@ function writeResults(decoded) {
         )
             continue;
         const level = chartLevels.get(`${musicId}:${diffIdx}`);
-        const volforce = calculatePlayVolforce(level, score, clearType);
+        const volforce = calculatePlayVolforce(
+            level,
+            score,
+            clearType,
+            isSkillAnalyzerMode(field(track, "mode")),
+        );
         if (volforce === undefined) {
             console.warn(
                 "Cannot calculate current-play VolForce: missing level or invalid score/clear type",
